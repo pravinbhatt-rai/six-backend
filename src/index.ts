@@ -22,10 +22,27 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
-app.use(express.json());
+
+// Root route - for Render and deployment verification
+app.get("/", (_req, res) => {
+  res.json({ 
+    success: true,
+    message: "Six Loan Backend API is running",
+    version: "1.0.0",
+    endpoints: {
+      health: "/health",
+      auth: "/auth",
+      admin: "/api/admin",
+      applications: "/api/applications",
+      loans: "/api/loans",
+      creditCards: "/api/credit-cards",
+      users: "/api/users"
+    }
+  });
+});
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, status: "healthy", timestamp: new Date().toISOString() });
 });
 
 // Auth routes
@@ -69,6 +86,25 @@ app.get("/api/insurance/by-category/:slug", async (req, res) => {
   }
 
   res.json({ category });
+});
+
+// 404 handler - must be after all routes
+app.use((_req, res) => {
+  res.status(404).json({ 
+    success: false,
+    error: "Route not found",
+    message: "The requested endpoint does not exist. Check /api for available routes."
+  });
+});
+
+// Error handler
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Error:", err);
+  res.status(500).json({ 
+    success: false,
+    error: "Internal server error",
+    message: process.env.NODE_ENV === 'production' ? "Something went wrong" : err.message
+  });
 });
 
 const PORT = process.env.PORT || 4000;
