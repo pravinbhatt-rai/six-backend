@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductType {
+  LOAN
+  CREDIT_CARD
+  INSURANCE
+  APP
+}
+
+enum ApplicationStatus {
+  PENDING
+  PROCESSING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  WITHDRAWN
+}
+
+enum LoanCategoryType {
+  PERSONAL
+  BUSINESS
+  HOME
+  VEHICLE
+  EDUCATION
+  OTHER
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  phone         String   @unique
+  passwordHash  String
+  role          Role     @default(USER)
+  emailVerified Boolean  @default(false)
+  otpVerified   Boolean  @default(false)
+  
+  // Additional User Details
+  panCard       String?
+  dob           DateTime?
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  employmentType String? // e.g. Salaried, Self-Employed, Business
+  monthlyIncome Float?
+  
+  // Saved Application Details (for pre-filling forms)
+  savedEmployerName    String?
+  savedWorkExperience  String?
+  savedResidenceType   String?
+  
+  applications  Application[]
+  
+  // Relations for tracking who created products
+  createdLoans       LoanProduct[]
+  createdCards       CreditCardProduct[]
+  createdInsurances  InsuranceProduct[]
+  createdApps        AppProduct[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+}
+
+model Application {
+  id          Int               @id @default(autoincrement())
+  referenceNo String?           @unique  // Smart reference number: SIX-L-PL-00123-A7
+  userId      Int
+  user        User              @relation(fields: [userId], references: [id])
+  type        ProductType
+  
+  // Polymorphic-ish relations (only one should be set)
+  loanId      Int?
+  loan        LoanProduct?      @relation(fields: [loanId], references: [id])
+  
+  cardId      Int?
+  card        CreditCardProduct? @relation(fields: [cardId], references: [id])
+  
+  insuranceId Int?
+  insurance   InsuranceProduct? @relation(fields: [insuranceId], references: [id])
+
+  // Category information
+  categoryId  Int?
+  categorySlug String?          // e.g., "personalloan", "business-loan"
+  categoryName String?          // e.g., "Personal Loan", "Business Loan"
+
+  status      ApplicationStatus @default(PENDING)
+  amount      Float?            // Requested amount (for loans)
+  notes       String?
+  
+  // Employment Details
+  employmentType    String?     // "salaried", "business", "professional"
+  monthlyIncome     String?     // Income range ID
+  employerName      String?     // Company name
+  workExperience    String?     // Work experience range
+  
+  // Residence Details
+  residenceType     String?     // "self", "parent", "rented", etc.
+  city              String?
+  pincode           String?
+  
+  // Contact Details (also in User, but kept here for record)
+  phone             String?
+  email             String?
+  panNumber         String?
+  applicantName     String?
+  
+  documents   Json?             // Array of { title, url }
+  feedback    String?           // Admin feedback to user
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String?
+  type        ProductType
+  
+  parentId    Int?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+
+  loans       LoanProduct[]
+  creditCards CreditCardProduct[] @relation("CardCategories")
+  insurances  InsuranceProduct[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InsuranceProduct {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  provider    String   // e.g. "HDFC Ergo"
+  logoUrl     String
+  type        String   // "Health", "Car" - Keeping for backward compat or specific type info
+  description String
+  minPremium  Float?
+  coverage    String?  // e.g. "Up to 5 Lakhs"
+  
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id])
+
+  createdById Int?
+  createdBy   User? @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now())
+  applications Application[]
+}
+
+model LoanProduct {
+  id                 Int       @id @default(autoincrement())
+  title              String
+  slug               String    @unique
+  bankName           String
+  bankLogoUrl        String
+  
+  // Display fields for card UI
+  tag                String?   // e.g. "Featured", "Popular", "New"
+  feature            String?   // e.g. "Fast Processing", "Low Interest"
+  specialization     String?   // e.g. "Quick approval with minimal documentation"
+  
+  // Fields from data.ts
+  processTimeLabel   String
+  processTimeValue   String
+  chanceOfApproval   String
+  approvalScore      Int       @default(0)
+  interestRateText   String
+  aprText            String
+  emiAmount          String
+  emiValue           Float     @default(0)
+  processTypeLabel   String
+  processTypeValue   String
+  disbursalTimeHours Float     @default(0)
+
+  productType        ProductType @default(LOAN)
+  
+  categoryId         Int?
+  category           Category? @relation(fields: [categoryId], references: [id])
+
+  // Short feature bullets shown in list and popup
+  bullets            LoanBullet[]
+
+  // Detailed sections for the loan details drawer
+  summaryCharges     LoanSummaryCharge[]
+  requiredDocuments  LoanRequiredDocument[]
+  processSteps       LoanProcessStep[]
+  keyStatement       String?
+  
+  // Footer checklist items for card display
+  footerItems        LoanFooterItem[]
+
+  applications       Application[]
+
+  createdById        Int?
+  createdBy          User? @relation(fields: [createdById], references: [id])
+
+  createdAt          DateTime  @default(now())
+}
+
+model LoanBullet {
+  id           Int         @id @default(autoincrement())
+  text         String
+  displayOrder Int         @default(0)
+  product      LoanProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model LoanSummaryCharge {
+  id           Int         @id @default(autoincrement())
+  label        String      // e.g. "Processing Fees"
+  mainText     String      // e.g. "2%"
+  subText      String?     // e.g. "on total loan amount"
+  displayOrder Int         @default(0)
+  product      LoanProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model LoanRequiredDocument {
+  id           Int         @id @default(autoincrement())
+  title        String      // e.g. "Identity Proof"
+  description  String?     // e.g. "PAN Card, Aadhaar Card"
+  displayOrder Int         @default(0)
+  product      LoanProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model LoanProcessStep {
+  id           Int         @id @default(autoincrement())
+  title        String
+  description  String?
+  displayOrder Int         @default(0)
+  product      LoanProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model LoanFooterItem {
+  id           Int         @id @default(autoincrement())
+  text         String      // e.g. "Admission Letter", "KYC Documents"
+  displayOrder Int         @default(0)
+  product      LoanProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model CreditCardProduct {
+  id               Int       @id @default(autoincrement())
+  name             String
+  slug             String    @unique
+  bankName         String
+  bankLogoUrl      String?
+  imageUrl         String
+  // categories       String[]  // Removed in favor of relation
+  categories       Category[] @relation("CardCategories")
+  annualFee        String    // e.g. "Lifetime free", "1st year free"
+  cardNetwork      String    // e.g. "Visa", "Rupay"
+  effectiveFree    Boolean   @default(false)
+  recommended      Boolean   @default(false)
+  rating           Float     @default(0)
+  
+  bulletPoints     CreditCardBullet[]
+  
+  // Detailed sections for the drawer
+  summaryCharges     CreditCardSummaryCharge[]
+  requiredDocuments  CreditCardRequiredDocument[]
+  processSteps       CreditCardProcessStep[]
+  keyStatement       String?
+
+  applications     Application[]
+  
+  createdById      Int?
+  createdBy        User? @relation(fields: [createdById], references: [id])
+
+  createdAt        DateTime  @default(now())
+}
+
+model CreditCardSummaryCharge {
+  id           Int               @id @default(autoincrement())
+  label        String
+  mainText     String
+  subText      String?
+  displayOrder Int               @default(0)
+  product      CreditCardProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model CreditCardRequiredDocument {
+  id           Int               @id @default(autoincrement())
+  title        String
+  description  String?
+  displayOrder Int               @default(0)
+  product      CreditCardProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model CreditCardProcessStep {
+  id           Int               @id @default(autoincrement())
+  title        String
+  description  String?
+  displayOrder Int               @default(0)
+  product      CreditCardProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}
+
+model AppProduct {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  downloadUrl String
+  logoUrl     String?
+  
+  createdById Int?
+  createdBy   User? @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now())
+}
+
+model CreditCardBullet {
+  id           Int               @id @default(autoincrement())
+  text         String
+  displayOrder Int               @default(0)
+  product      CreditCardProduct @relation(fields: [productId], references: [id])
+  productId    Int
+}

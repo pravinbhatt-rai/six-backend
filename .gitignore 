@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Prisma
+# Ignore the generated client and migration files
+/prisma/migrations/
+/prisma/*.db
+/prisma/*.db-journal
+!/prisma/schema.prisma  # ← This is the important line - KEEP the schema file!
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache
+.cache/
+.eslintcache
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Package manager specific
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Optional REPL history
+.node_repl_history
+
+# Test coverage
+coverage/
+
+# Production
+.cache-loader

@@ -1,0 +1,23 @@
+
+> six-loan-backend@0.1.0 dev
+> ts-node-dev --respawn src/index.ts
+
+[INFO] 20:05:13 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.9.3)
+Error: listen EADDRINUSE: address already in use :::4000
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at app.listen (/Users/pravinbhattarai/Desktop/sixloan/backend/node_modules/express/lib/application.js:635:24)
+    at Object.<anonymous> (/Users/pravinbhattarai/Desktop/sixloan/backend/src/index.ts:69:5)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1761:14)
+    at Module._compile (/Users/pravinbhattarai/Desktop/sixloan/backend/node_modules/source-map-support/source-map-support.js:568:25)
+    at Module.m._compile (/private/var/folders/k7/w4w4dnsd1t3dhnn41gym8j780000gn/T/ts-node-dev-hook-23706913091818738.js:69:33)
+    at node:internal/modules/cjs/loader:1893:10
+    at require.extensions..jsx.require.extensions..js (/private/var/folders/k7/w4w4dnsd1t3dhnn41gym8j780000gn/T/ts-node-dev-hook-23706913091818738.js:114:20)
+    at require.extensions.<computed> (/private/var/folders/k7/w4w4dnsd1t3dhnn41gym8j780000gn/T/ts-node-dev-hook-23706913091818738.js:71:20)
+    at Object.nodeDevHook [as .ts] (/Users/pravinbhattarai/Desktop/sixloan/backend/node_modules/ts-node-dev/lib/hook.js:63:13)
+    at Module.load (node:internal/modules/cjs/loader:1481:32)
+    at Module._load (node:internal/modules/cjs/loader:1300:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+[ERROR] 20:05:14 Error: listen EADDRINUSE: address already in use :::4000
