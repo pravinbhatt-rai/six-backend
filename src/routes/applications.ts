@@ -117,18 +117,26 @@ router.post("/", async (req, res) => {
       });
       console.log('Created new user:', user.id);
     } else {
-        // Update user details if missing
+        // Update user details - save employment information to profile
+        const updateData: any = {
+            name: name || user.name,
+            panCard: panNumber || user.panCard,
+            city: city || user.city,
+            pincode: pincode || user.pincode,
+            employmentType: employmentType || user.employmentType,
+        };
+        
+        // Save employment details to user profile for future use
+        if (employerName) updateData.savedEmployerName = employerName;
+        if (workExperience) updateData.savedWorkExperience = workExperience;
+        if (residenceType) updateData.savedResidenceType = residenceType;
+        if (monthlyIncome) updateData.monthlyIncome = parseFloat(String(monthlyIncome).replace(/[^0-9.]/g, ''));
+        
         await prisma.user.update({
             where: { id: user.id },
-            data: {
-                name: name || user.name,
-                panCard: panNumber || user.panCard,
-                city: city || user.city,
-                pincode: pincode || user.pincode,
-                employmentType: employmentType || user.employmentType,
-            }
+            data: updateData
         });
-        console.log('Updated existing user:', user.id);
+        console.log('Updated existing user with employment details:', user.id);
     }
 
     // 2. Get Category ID if slug provided

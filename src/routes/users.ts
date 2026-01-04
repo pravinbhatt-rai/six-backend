@@ -369,15 +369,12 @@ router.put("/profile", async (req: any, res) => {
   }
 });
 
-// GET /api/users/applications - Get user's applications (exclude WITHDRAWN)
+// GET /api/users/applications - Get user's applications (include WITHDRAWN)
 router.get("/applications", authenticateUser, async (req: any, res) => {
   try {
     const applications = await prisma.application.findMany({
       where: { 
         userId: req.userId,
-        status: {
-          not: 'WITHDRAWN'
-        }
       },
       include: {
         loan: { 
@@ -409,21 +406,38 @@ router.get("/applications", authenticateUser, async (req: any, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    // Format applications for frontend
+    // Format applications for frontend with all details
     const formattedApplications = applications.map((app: any) => ({
       id: app.id,
+      referenceNo: app.referenceNo,
       type: app.type,
       status: app.status,
       amount: app.amount,
+      tenure: app.tenure,
       categoryName: app.categoryName,
+      categorySlug: app.categorySlug,
       employmentType: app.employmentType,
+      monthlyIncome: app.monthlyIncome,
+      employerName: app.employerName,
+      workExperience: app.workExperience,
+      residenceType: app.residenceType,
+      city: app.city,
+      pincode: app.pincode,
+      address: app.address,
+      phone: app.phone,
+      email: app.email,
+      panNumber: app.panNumber,
+      applicantName: app.applicantName,
+      feedback: app.feedback,
+      additionalInfo: app.notes,
+      documents: app.documents,
       createdAt: app.createdAt.toISOString(),
       updatedAt: app.updatedAt.toISOString(),
       
-      // Product info based on types
-      product: app.type === 'LOAN' ? app.loan :
-               app.type === 'CREDIT_CARD' ? app.card :
-               app.type === 'INSURANCE' ? app.insurance : null,
+      // Product info
+      loan: app.loan,
+      card: app.card,
+      insurance: app.insurance,
     }));
 
     res.json({ 
@@ -551,11 +565,13 @@ router.put("/applications/:id/withdraw", authenticateUser, async (req: any, res)
       return res.status(403).json({ error: "You can only withdraw your own applications" });
     }
 
-    // Check if application can be withdrawn (only PENDING or IN_PROGRESS)
-    if (application.status !== 'PENDING' && application.status !== 'IN_PROGRESS') {
+    // Check if application can be withdrawn (allow PENDING, PROCESSING, UNDER_REVIEW, IN_PROGRESS)
+    const withdrawableStatuses = ['PENDING', 'PROCESSING', 'UNDER_REVIEW', 'IN_PROGRESS'];
+    if (!withdrawableStatuses.includes(application.status)) {
       return res.status(400).json({ 
         error: `Cannot withdraw application with status: ${application.status}`,
-        currentStatus: application.status
+        currentStatus: application.status,
+        message: 'Only pending or in-progress applications can be withdrawn'
       });
     }
 
