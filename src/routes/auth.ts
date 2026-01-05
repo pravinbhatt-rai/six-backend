@@ -257,7 +257,6 @@ router.post("/signup/complete", async (req, res) => {
         email: pending.email,
         phone: pending.phone,
         passwordHash: pending.passwordHash,
-        emailVerified: true, // Mark email as verified
         emailVerifiedAt: new Date(), // Mark email as verified
       },
     });
@@ -266,7 +265,7 @@ router.post("/signup/complete", async (req, res) => {
     pendingRegistrations.delete(email);
 
     // Send welcome email (non-blocking)
-    sendWelcomeEmail(user.email, user.name).catch((err: any) => {
+    sendWelcomeEmail(user.email, user.name).catch((err) => {
       console.error("[Welcome Email] Failed to send welcome email:", err);
       // Don't fail the registration if email fails
     });
@@ -433,7 +432,7 @@ router.post("/login", async (req, res) => {
     }
 
     // Check if email is verified
-    if (!user.emailVerified && !user.emailVerifiedAt) {
+    if (!user.emailVerifiedAt) {
       return res.status(403).json({ 
         error: "Email not verified", 
         message: "Please verify your email before logging in. Check your email for the OTP.",
