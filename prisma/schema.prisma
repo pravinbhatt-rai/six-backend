@@ -49,6 +49,11 @@ model User {
   emailVerified Boolean  @default(false)
   otpVerified   Boolean  @default(false)
   
+  // Email OTP Verification Fields
+  emailOtp      String?
+  emailOtpExpiry DateTime?
+  emailVerifiedAt DateTime?
+  
   // Additional User Details
   panCard       String?
   dob           DateTime?
@@ -80,18 +85,18 @@ model Application {
   id          Int               @id @default(autoincrement())
   referenceNo String?           @unique  // Smart reference number: SIX-L-PL-00123-A7
   userId      Int
-  user        User              @relation(fields: [userId], references: [id])
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   type        ProductType
   
   // Polymorphic-ish relations (only one should be set)
   loanId      Int?
-  loan        LoanProduct?      @relation(fields: [loanId], references: [id])
+  loan        LoanProduct?      @relation(fields: [loanId], references: [id], onDelete: Cascade)
   
   cardId      Int?
-  card        CreditCardProduct? @relation(fields: [cardId], references: [id])
+  card        CreditCardProduct? @relation(fields: [cardId], references: [id], onDelete: Cascade)
   
   insuranceId Int?
-  insurance   InsuranceProduct? @relation(fields: [insuranceId], references: [id])
+  insurance   InsuranceProduct? @relation(fields: [insuranceId], references: [id], onDelete: Cascade)
 
   // Category information
   categoryId  Int?

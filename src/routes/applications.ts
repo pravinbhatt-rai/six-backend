@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { sendApplicationConfirmationEmail } from "../utils/emailService";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -237,6 +238,26 @@ router.post("/", async (req, res) => {
       where: { id: application.id },
       data: { referenceNo }
     });
+
+    // Send application confirmation email (non-blocking)
+    const productDisplayName = categoryName || 
+      (application.loan?.bankName ? `${application.loan.bankName} Loan` : productType.replace('_', ' '));
+    
+    const productTypeFormatted = dbProductType === 'CREDIT_CARD' ? 'CREDIT_CARD' : 
+                                 dbProductType === 'INSURANCE' ? 'INSURANCE' : 'LOAN';
+    
+    sendApplicationConfirmationEmail(
+      application.user.email,
+      application.user.name,
+      productDisplayName,
+      productTypeFormatted,
+      referenceNo
+    ).catch((err: any) => {
+      console.error("[Application Email] Failed to send application confirmation:", err);
+      // Don't fail the application if email fails
+    });
+
+    console.log(`[Application Email] Confirmation email queued for ${application.user.email} (Ref: ${referenceNo})`);
 
     res.json({ 
       success: true, 

@@ -8,6 +8,7 @@ import applicationsRouter from "./routes/applications";
 import loansRouter from "./routes/loans";
 import creditCardsRouter from "./routes/creditCards";
 import usersRouter from "./routes/users";
+import emailVerificationRouter from "./routes/emailVerification";
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ const prisma = new PrismaClient();
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || "http://localhost:3000",
+  origin: process.env.FRONTEND_ORIGIN || "localhost:3000",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -63,11 +64,7 @@ app.use("/api/credit-cards", creditCardsRouter);
 // User routes
 app.use("/api/users", usersRouter);
 
-// Loan routes
-app.use("/api/loans", loansRouter);
-
-// Credit Card routes
-app.use("/api/credit-cards", creditCardsRouter);
+app.use("/api/email-verification", emailVerificationRouter);
 
 // Insurance by category slug
 app.get("/api/insurance/by-category/:slug", async (req, res) => {
