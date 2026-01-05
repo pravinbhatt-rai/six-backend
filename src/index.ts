@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || "localhost:3000",
+  origin: process.env.FRONTEND_ORIGIN || "https://six-loan.vercel.app/",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
