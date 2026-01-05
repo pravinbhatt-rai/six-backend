@@ -1,6 +1,23 @@
 import nodemailer from 'nodemailer';
 
-const emailService = nodemailer.createTransport({
+// Validate email configuration on startup
+const validateEmailConfig = () => {
+  const required = ['EMAIL_USER', 'EMAIL_PASSWORD'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.warn(`⚠️  Email configuration incomplete. Missing: ${missing.join(', ')}`);
+    console.warn('⚠️  Email sending will be disabled until configured.');
+    return false;
+  }
+  
+  console.log('✓ Email configuration validated');
+  return true;
+};
+
+const isEmailConfigured = validateEmailConfig();
+
+const emailService = isEmailConfigured ? nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -13,7 +30,7 @@ const emailService = nodemailer.createTransport({
   pool: true,               // Use connection pooling
   maxConnections: 5,        // Max simultaneous connections
   maxMessages: 100,         // Max messages per connection
-});
+}) : null;
 
 interface SendEmailOptions {
   to: string;
@@ -24,6 +41,11 @@ interface SendEmailOptions {
 
 // Retry logic for email sending
 const sendEmailWithRetry = async (options: SendEmailOptions, retries = 2): Promise<boolean> => {
+  if (!isEmailConfigured || !emailService) {
+    console.warn('⚠️  Email not sent - service not configured');
+    return false;
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       await emailService.sendMail({
@@ -33,16 +55,41 @@ const sendEmailWithRetry = async (options: SendEmailOptions, retries = 2): Promi
       console.log(`✓ Email sent successfully to ${options.to}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
       return true;
     } catch (error: any) {
-      console.error(`✗ Email attempt ${attempt + 1} failed:`, error.message);
+      // Enhanced error logging
+      const errorContext = {
+        attempt: attempt + 1,
+        maxRetries: retries + 1,
+        errorCode: error.code,
+        errorMessage: error.message,
+        command: error.command,
+        responseCode: error.responseCode,
+        to: options.to,
+      };
       
-      // If it's the last attempt or a non-retryable error, fail
-      if (attempt === retries || error.code === 'EAUTH') {
-        console.error('Failed to send email after all retries:', error);
+      console.error('✗ Email send error:', JSON.stringify(errorContext, null, 2));
+      
+      // Don't retry on authentication errors
+      if (error.code === 'EAUTH' || error.responseCode === 535) {
+        console.error('✗ Authentication failed - verify EMAIL_USER and EMAIL_PASSWORD in environment');
         return false;
       }
       
-      // Wait before retry (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+      // Don't retry on invalid recipient errors
+      if (error.responseCode === 550) {
+        console.error('✗ Invalid recipient email address');
+        return false;
+      }
+      
+      // If it's the last attempt, fail
+      if (attempt === retries) {
+        console.error(`✗ Failed to send email after ${retries + 1} attempts`);
+        return false;
+      }
+      
+      // Wait before retry (exponential backoff: 1s, 2s, 4s...)
+      const delay = 1000 * Math.pow(2, attempt);
+      console.log(`Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   return false;

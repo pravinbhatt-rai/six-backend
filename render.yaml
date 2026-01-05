@@ -19,3 +19,15 @@ services:
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
+      - key: EMAIL_SERVICE
+        value: gmail
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: OTP_EXPIRY_MINUTES
+        value: 10
+      - key: OTP_LENGTH
+        value: 6
