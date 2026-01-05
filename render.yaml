@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: six-loan-backend
+    runtime: node
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
