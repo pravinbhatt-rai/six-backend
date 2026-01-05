@@ -1,23 +1,33 @@
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
 // Validate email configuration on startup
 const validateEmailConfig = () => {
+  // Check for SendGrid first (recommended for Render)
+  if (process.env.SENDGRID_API_KEY) {
+    console.log('✓ SendGrid email configuration validated');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    return { provider: 'sendgrid', configured: true };
+  }
+  
+  // Fallback to SMTP (Gmail, etc.)
   const required = ['EMAIL_USER', 'EMAIL_PASSWORD'];
   const missing = required.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
     console.warn(`⚠️  Email configuration incomplete. Missing: ${missing.join(', ')}`);
     console.warn('⚠️  Email sending will be disabled until configured.');
-    return false;
+    return { provider: 'none', configured: false };
   }
   
-  console.log('✓ Email configuration validated');
-  return true;
+  console.log('✓ SMTP email configuration validated');
+  return { provider: 'smtp', configured: true };
 };
 
-const isEmailConfigured = validateEmailConfig();
+const emailConfig = validateEmailConfig();
+const isEmailConfigured = emailConfig.configured;
 
-const emailService = isEmailConfigured ? nodemailer.createTransport({
+const emailService = (emailConfig.provider === 'smtp') ? nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -41,57 +51,89 @@ interface SendEmailOptions {
 
 // Retry logic for email sending
 const sendEmailWithRetry = async (options: SendEmailOptions, retries = 2): Promise<boolean> => {
-  if (!isEmailConfigured || !emailService) {
+  if (!isEmailConfigured) {
     console.warn('⚠️  Email not sent - service not configured');
     return false;
   }
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      await emailService.sendMail({
-        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-        ...options,
-      });
-      console.log(`✓ Email sent successfully to ${options.to}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
-      return true;
-    } catch (error: any) {
-      // Enhanced error logging
-      const errorContext = {
-        attempt: attempt + 1,
-        maxRetries: retries + 1,
-        errorCode: error.code,
-        errorMessage: error.message,
-        command: error.command,
-        responseCode: error.responseCode,
-        to: options.to,
-      };
-      
-      console.error('✗ Email send error:', JSON.stringify(errorContext, null, 2));
-      
-      // Don't retry on authentication errors
-      if (error.code === 'EAUTH' || error.responseCode === 535) {
-        console.error('✗ Authentication failed - verify EMAIL_USER and EMAIL_PASSWORD in environment');
-        return false;
+  // Use SendGrid if configured
+  if (emailConfig.provider === 'sendgrid') {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        await sgMail.send({
+          to: options.to,
+          from: process.env.EMAIL_FROM || process.env.SENDGRID_FROM || 'noreply@yourdomain.com',
+          subject: options.subject,
+          html: options.html,
+          text: options.text,
+        });
+        console.log(`✓ Email sent via SendGrid to ${options.to}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+        return true;
+      } catch (error: any) {
+        console.error(`✗ SendGrid attempt ${attempt + 1} failed:`, error.response?.body || error.message);
+        
+        if (attempt === retries) {
+          console.error(`✗ Failed to send email after ${retries + 1} attempts`);
+          return false;
+        }
+        
+        const delay = 1000 * Math.pow(2, attempt);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-      
-      // Don't retry on invalid recipient errors
-      if (error.responseCode === 550) {
-        console.error('✗ Invalid recipient email address');
-        return false;
-      }
-      
-      // If it's the last attempt, fail
-      if (attempt === retries) {
-        console.error(`✗ Failed to send email after ${retries + 1} attempts`);
-        return false;
-      }
-      
-      // Wait before retry (exponential backoff: 1s, 2s, 4s...)
-      const delay = 1000 * Math.pow(2, attempt);
-      console.log(`Retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
+
+  // Use SMTP (Gmail, etc.)
+  if (emailConfig.provider === 'smtp' && emailService) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        await emailService.sendMail({
+          from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+          ...options,
+        });
+        console.log(`✓ Email sent via SMTP to ${options.to}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+        return true;
+      } catch (error: any) {
+        // Enhanced error logging
+        const errorContext = {
+          attempt: attempt + 1,
+          maxRetries: retries + 1,
+          errorCode: error.code,
+          errorMessage: error.message,
+          command: error.command,
+          responseCode: error.responseCode,
+          to: options.to,
+        };
+        
+        console.error('✗ Email send error:', JSON.stringify(errorContext, null, 2));
+        
+        // Don't retry on authentication errors
+        if (error.code === 'EAUTH' || error.responseCode === 535) {
+          console.error('✗ Authentication failed - verify EMAIL_USER and EMAIL_PASSWORD in environment');
+          return false;
+        }
+        
+        // Don't retry on invalid recipient errors
+        if (error.responseCode === 550) {
+          console.error('✗ Invalid recipient email address');
+          return false;
+        }
+        
+        // If it's the last attempt, fail
+        if (attempt === retries) {
+          console.error(`✗ Failed to send email after ${retries + 1} attempts`);
+          return false;
+        }
+        
+        // Wait before retry (exponential backoff: 1s, 2s, 4s...)
+        const delay = 1000 * Math.pow(2, attempt);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
   return false;
 };
 

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",
+    "@sendgrid/mail": "^8.1.6",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",

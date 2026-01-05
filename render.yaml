@@ -19,6 +19,12 @@ services:
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
+      # SendGrid (Recommended for Render - handles firewall issues)
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM
+        sync: false
+      # SMTP (Backup - may timeout on Render free tier)
       - key: EMAIL_SERVICE
         value: gmail
       - key: EMAIL_USER
