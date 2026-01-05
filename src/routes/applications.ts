@@ -330,6 +330,7 @@ router.get("/:id", async (req, res) => {
             bankName: true,
             slug: true
           }
+           
         }
       }
     });
