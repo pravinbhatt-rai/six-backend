@@ -10,6 +10,27 @@ import { generateOTP, getOTPExpiry, isOtpExpired } from "../utils/otpGenerator";
 const prisma = new PrismaClient();
 const router = Router();
 
+// Normalize phone number - remove duplicate country codes
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return phone;
+  
+  // Remove all spaces and trim
+  let normalized = phone.trim().replace(/\s+/g, '');
+  
+  // If phone starts with +91+91, remove the duplicate
+  if (normalized.startsWith('+91+91')) {
+    normalized = normalized.replace('+91+91', '+91');
+  }
+  
+  // If phone has multiple +91 prefixes, keep only the first one
+  const countryCodeMatches = normalized.match(/\+91/g);
+  if (countryCodeMatches && countryCodeMatches.length > 1) {
+    normalized = '+91' + normalized.split('+91').filter(Boolean).join('');
+  }
+  
+  return normalized;
+}
+
 const JWT_SECRET = process.env.JWT_SECRET;
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
@@ -158,6 +179,9 @@ router.post("/signup/initiate", async (req, res) => {
       return res.status(400).json({ error: "name, email, phone, password are required" });
     }
 
+    // Normalize phone number
+    const normalizedPhone = normalizePhoneNumber(phone);
+
     // Validate password strength
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.valid) {
@@ -167,7 +191,7 @@ router.post("/signup/initiate", async (req, res) => {
     // Check if user already exists
     const existing = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { phone }],
+        OR: [{ email }, { phone: normalizedPhone }],
       },
     });
     if (existing) {
@@ -183,20 +207,17 @@ router.post("/signup/initiate", async (req, res) => {
     pendingRegistrations.set(email, {
       name,
       email,
-      phone,
+      phone: normalizedPhone,
       passwordHash,
       otp,
       otpExpiry,
       createdAt: new Date(),
     });
 
-    // Send OTP email
-    const emailSent = await sendOtpEmail(email, otp, name);
-    
-    if (!emailSent) {
-      pendingRegistrations.delete(email); // Clean up on failure
-      return res.status(500).json({ error: "Failed to send OTP email" });
-    }
+    // Send OTP email (non-blocking for faster response)
+    sendOtpEmail(email, otp, name).catch((err: any) => {
+      console.error("[Signup OTP] Failed to send email:", err);
+    });
 
     console.log(`[Signup] OTP sent to ${email}: ${otp}`); // For development/testing
 

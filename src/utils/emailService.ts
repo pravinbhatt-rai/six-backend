@@ -6,6 +6,13 @@ const emailService = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
   },
+  // Add timeouts and optimization
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 5000,    // 5 seconds
+  socketTimeout: 15000,     // 15 seconds
+  pool: true,               // Use connection pooling
+  maxConnections: 5,        // Max simultaneous connections
+  maxMessages: 100,         // Max messages per connection
 });
 
 interface SendEmailOptions {
@@ -15,18 +22,34 @@ interface SendEmailOptions {
   text?: string;
 }
 
-export const sendEmail = async (options: SendEmailOptions): Promise<boolean> => {
-  try {
-    await emailService.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      ...options,
-    });
-    console.log(`Email sent successfully to ${options.to}`);
-    return true;
-  } catch (error) {
-    console.error('Failed to send email:', error);
-    return false;
+// Retry logic for email sending
+const sendEmailWithRetry = async (options: SendEmailOptions, retries = 2): Promise<boolean> => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      await emailService.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+        ...options,
+      });
+      console.log(`✓ Email sent successfully to ${options.to}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`);
+      return true;
+    } catch (error: any) {
+      console.error(`✗ Email attempt ${attempt + 1} failed:`, error.message);
+      
+      // If it's the last attempt or a non-retryable error, fail
+      if (attempt === retries || error.code === 'EAUTH') {
+        console.error('Failed to send email after all retries:', error);
+        return false;
+      }
+      
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+    }
   }
+  return false;
+};
+
+export const sendEmail = async (options: SendEmailOptions): Promise<boolean> => {
+  return sendEmailWithRetry(options);
 };
 
 export const sendOtpEmail = async (email: string, otp: string, name?: string): Promise<boolean> => {

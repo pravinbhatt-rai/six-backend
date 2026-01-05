@@ -1,6 +1,27 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+
+// Normalize phone number - remove duplicate country codes
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return phone;
+  
+  // Remove all spaces and trim
+  let normalized = phone.trim().replace(/\s+/g, '');
+  
+  // If phone starts with +91+91, remove the duplicate
+  if (normalized.startsWith('+91+91')) {
+    normalized = normalized.replace('+91+91', '+91');
+  }
+  
+  // If phone has multiple +91 prefixes, keep only the first one
+  const countryCodeMatches = normalized.match(/\+91/g);
+  if (countryCodeMatches && countryCodeMatches.length > 1) {
+    normalized = '+91' + normalized.split('+91').filter(Boolean).join('');
+  }
+  
+  return normalized;
+}
 import { sendApplicationConfirmationEmail } from "../utils/emailService";
 
 const prisma = new PrismaClient();
@@ -94,10 +115,13 @@ router.post("/", async (req, res) => {
       employmentType 
     });
 
+    // Normalize phone number to prevent duplicates like +91+91
+    const normalizedPhone = normalizePhoneNumber(phone);
+
     // 1. Find or Create User
     let user = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { phone }],
+        OR: [{ email }, { phone: normalizedPhone }],
       },
     });
     
@@ -108,7 +132,7 @@ router.post("/", async (req, res) => {
         data: {
           name: name || 'User',
           email,
-          phone,
+          phone: normalizedPhone,
           passwordHash: hashedPassword,
           panCard: panNumber,
           city,
@@ -181,7 +205,7 @@ router.post("/", async (req, res) => {
       pincode,
       
       // Contact details
-      phone,
+      phone: normalizedPhone,
       email,
       panNumber,
       applicantName: name || user.name,
